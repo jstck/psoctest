@@ -12,15 +12,21 @@
 #define ALS_SENSOR_CHANNEL          (2u)
 #define ANALOG0_CHANNEL             (3u)
 #define ANALOG1_CHANNEL             (4u)
+#define CHANNEL_COUNT               (5u)
+#define ALL_CHANNELS_SEEN_MASK      ((1u << CHANNEL_COUNT) - 1u)
 
 #define R_REFERENCE                 (10000.0f)
 #define B_CONSTANT                  (3380.0f)
 #define R_INFINITY                  (0.1192855f)
 #define ABSOLUTE_ZERO_C             (-273.15)
-#define ALS_OFFSET_PERCENT          (20)
+#define ALS_DARK_COUNTS             (100.0)
+#define ALS_FULL_SCALE_COUNTS       (32767.0)
 
 static double calculate_temperature_c(int32_t therm_count, int32_t ref_count);
 static uint8_t calculate_light_percent(int32_t adc_count);
+
+static int32_t latest_counts[CHANNEL_COUNT];
+static uint32_t seen_channels;
 
 cy_rslt_t sensors_adc_init(void)
 {
@@ -56,6 +62,8 @@ cy_rslt_t sensors_adc_init(void)
 
     Cy_SAR_Enable(SAR0);
 
+    Cy_SysAnalog_TimerEnable(PASS);
+
     return CY_RSLT_SUCCESS;
 }
 
@@ -66,27 +74,40 @@ cy_rslt_t sensors_adc_read(sensor_readings_t *readings)
         return CY_RSLT_TYPE_ERROR;
     }
 
-    memset(readings, 0, sizeof(*readings));
+    cy_stc_sar_fifo_read_t fifo_data = {0};
+    uint32_t data_count = Cy_SAR_FifoGetDataCount(SAR0);
 
-    Cy_SAR_ClearInterrupt(SAR0, CY_SAR_INTR_EOS);
-    Cy_SAR_StartConvert(SAR0, CY_SAR_START_CONVERT_SINGLE_SHOT);
-
-    if (CY_SAR_SUCCESS != Cy_SAR_IsEndConversion(SAR0, CY_SAR_WAIT_FOR_RESULT))
+    while (data_count > 0u)
     {
-        return CY_RSLT_TYPE_ERROR;
+        --data_count;
+        Cy_SAR_FifoRead(SAR0, &fifo_data);
+
+        if (fifo_data.channel < CHANNEL_COUNT)
+        {
+            latest_counts[fifo_data.channel] = fifo_data.value;
+            seen_channels |= (1u << fifo_data.channel);
+        }
     }
 
-    readings->reference_counts = Cy_SAR_GetResult32(SAR0, REF_RESISTOR_CHANNEL);
-    readings->thermistor_counts = Cy_SAR_GetResult32(SAR0, THERMISTOR_SENSOR_CHANNEL);
-    readings->als_counts = Cy_SAR_GetResult32(SAR0, ALS_SENSOR_CHANNEL);
-    readings->analog0_counts = Cy_SAR_GetResult32(SAR0, ANALOG0_CHANNEL);
-    readings->analog1_counts = Cy_SAR_GetResult32(SAR0, ANALOG1_CHANNEL);
+    memset(readings, 0, sizeof(*readings));
+
+    readings->reference_counts = latest_counts[REF_RESISTOR_CHANNEL];
+    readings->thermistor_counts = latest_counts[THERMISTOR_SENSOR_CHANNEL];
+    readings->als_counts = latest_counts[ALS_SENSOR_CHANNEL];
+    readings->analog0_counts = latest_counts[ANALOG0_CHANNEL];
+    readings->analog1_counts = latest_counts[ANALOG1_CHANNEL];
 
     readings->temperature_c = calculate_temperature_c(readings->thermistor_counts,
                                                        readings->reference_counts);
     readings->light_percent = calculate_light_percent(readings->als_counts);
+    readings->adc_ok = (seen_channels & ALL_CHANNELS_SEEN_MASK) == ALL_CHANNELS_SEEN_MASK;
 
-    return CY_RSLT_SUCCESS;
+    if (readings->adc_ok)
+    {
+        return CY_RSLT_SUCCESS;
+    }
+
+    return CY_RSLT_TYPE_ERROR;
 }
 
 static double calculate_temperature_c(int32_t therm_count, int32_t ref_count)
@@ -105,22 +126,30 @@ static double calculate_temperature_c(int32_t therm_count, int32_t ref_count)
 
 static uint8_t calculate_light_percent(int32_t adc_count)
 {
+    double normalized;
     int32_t als_level;
 
-    if (adc_count < 0)
+    if (adc_count <= (int32_t)ALS_DARK_COUNTS)
     {
-        adc_count = 0;
+        return 0u;
     }
 
-    als_level = ((adc_count * 100) >> 10) - ALS_OFFSET_PERCENT;
-
-    if (als_level > 100)
+    if (adc_count >= (int32_t)ALS_FULL_SCALE_COUNTS)
     {
-        als_level = 100;
+        return 100u;
     }
-    else if (als_level < 0)
+
+    normalized = log((double)adc_count / ALS_DARK_COUNTS) /
+                 log(ALS_FULL_SCALE_COUNTS / ALS_DARK_COUNTS);
+    als_level = (int32_t)((normalized * 100.0) + 0.5);
+
+    if (als_level < 0)
     {
         als_level = 0;
+    }
+    else if (als_level > 100)
+    {
+        als_level = 100;
     }
 
     return (uint8_t)als_level;

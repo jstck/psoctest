@@ -1,6 +1,5 @@
 #include "telemetry.h"
 
-#include <inttypes.h>
 #include <stdio.h>
 
 void telemetry_print_header(void)
@@ -14,19 +13,19 @@ void telemetry_print(const sensor_readings_t *sensors,
                      const capsense_app_state_t *capsense,
                      uint16_t gpio_mask)
 {
-    printf("T=%2.1fC ALS=%" PRIu8 "%% BTN0=%u BTN1=%u SLIDER=%u/%u GPIO=0x%02" PRIX16
-           " TH=%" PRId32 " REF=%" PRId32 " ALS_RAW=%" PRId32
-           " A0=%" PRId32 " A1=%" PRId32 "\r\n",
+    printf("ADC=%s T=%3.1fC ALS=%u%% BTN0=%u BTN1=%u SLIDER=%3u/%3u GPIO=0x%02X"
+           " TH=%ld REF=%ld ALS_RAW=%ld A0=%ld A1=%ld\r\n",
+           sensors->adc_ok ? "OK" : "ERR",
            sensors->temperature_c,
-           sensors->light_percent,
+           (unsigned int)sensors->light_percent,
            capsense->button0_active ? 1u : 0u,
            capsense->button1_active ? 1u : 0u,
-           capsense->slider_active ? capsense->slider_position : 0u,
-           capsense->slider_resolution,
-           gpio_mask,
-           sensors->thermistor_counts,
-           sensors->reference_counts,
-           sensors->als_counts,
-           sensors->analog0_counts,
-           sensors->analog1_counts);
+           (unsigned int)(capsense->slider_active ? capsense->slider_position : 0u),
+           (unsigned int)capsense->slider_resolution,
+           (unsigned int)gpio_mask,
+           (long)sensors->thermistor_counts,
+           (long)sensors->reference_counts,
+           (long)sensors->als_counts,
+           (long)sensors->analog0_counts,
+           (long)sensors->analog1_counts);
 }

@@ -1,11 +1,13 @@
 #ifndef SOURCE_SENSORS_ADC_H_
 #define SOURCE_SENSORS_ADC_H_
 
+#include <stdbool.h>
 #include <stdint.h>
 #include "cy_result.h"
 
 typedef struct
 {
+    bool adc_ok;
     int32_t thermistor_counts;
     int32_t reference_counts;
     int32_t als_counts;
