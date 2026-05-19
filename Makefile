@@ -85,20 +85,28 @@ VERBOSE=
 # ... then code in directories named COMPONENT_foo and COMPONENT_bar will be
 # added to the build
 #
-COMPONENTS=
+COMPONENTS=U8G2
 
 # Like COMPONENTS, but disable optional code that was enabled by default.
 DISABLE_COMPONENTS=
+
+# Use source/u8g2_support.c (finite I2C timeout) instead of the library copy.
+CY_IGNORE += mtb_shared/display-oled-ssd1306/release-v1.0.3/configs/u8g2/u8g2_support.c
+
+# u8g2 csrc — fetched by `make deps` / `make getlibs` into gitignored libs/u8g2/.
+# Ignore auto-discovery of the full upstream tree; compile only csrc/*.c via SOURCES.
+U8G2_ROOT=libs/u8g2
+CY_IGNORE += $(U8G2_ROOT)
 
 # By default the build system automatically looks in the Makefile's directory
 # tree for source code and builds it. The SOURCES variable can be used to
 # manually add source code to the build process from a location not searched
 # by default, or otherwise not found by the build system.
-SOURCES=
+SOURCES=$(wildcard $(U8G2_ROOT)/csrc/*.c)
 
 # Like SOURCES, but for include directories. Value should be paths to
 # directories (without a leading -I).
-INCLUDES=
+INCLUDES=$(U8G2_ROOT)/csrc
 
 # Add additional defines to the build process (without a leading -D).
 DEFINES=
@@ -116,8 +124,6 @@ CFLAGS=
 #
 # NOTE: Includes and defines should use the INCLUDES and DEFINES variable
 # above.
-CXXFLAGS=
-
 # Additional / custom assembler flags.
 #
 # NOTE: Includes and defines should use the INCLUDES and DEFINES variable
@@ -162,6 +168,7 @@ CY_GETLIBS_SHARED_PATH=./
 #
 CY_GETLIBS_SHARED_NAME=mtb_shared
 
+
 # Absolute path to the compiler's "bin" directory. The variable name depends on the 
 # toolchain used for the build. Refer to the ModusToolbox user guide to get the correct
 # variable name for the toolchain used in your build.
@@ -195,3 +202,7 @@ endif
 $(info Tools Directory: $(CY_TOOLS_DIR))
 
 include $(CY_TOOLS_DIR)/make/start.mk
+
+# Fetch Infineon libs (make getlibs) and third-party assets (deps/*.mtb, e.g. u8g2).
+.PHONY: deps
+deps: getlibs

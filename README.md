@@ -6,9 +6,10 @@ Template firmware for the CY8CKIT-062S4 PSoC 62S4 Pioneer Kit.
 
 - CapSense buttons and 5-segment slider.
 - SAR ADC scaffold for the onboard thermistor, onboard ambient light sensor, and Arduino A0/A1 header inputs.
-- Eight pulled-up GPIO inputs on Arduino D2-D9.
+- Seven pulled-up GPIO inputs on Arduino D3-D9 (D2 is MCP23008 INT when that board is used).
 - User LED heartbeat on LED1 and ambient-light threshold output on LED2.
 - I2C master on P6[4] SCL / P6[5] SDA.
+- SSD1306 128x64 OLED via Infineon `display-oled-ssd1306` + u8g2 (see `source/display_gfx.*` for Adafruit-like helpers).
 - MIDI UART scaffold on Arduino D1 TX / D0 RX at 31250 baud.
 - Human-readable telemetry on the KitProg USB serial UART at 115200 baud.
 
@@ -35,7 +36,7 @@ $MODUSTOOLBOX_HOME/packs/ModusToolbox-Multi-Sense-Pack
 From this project directory:
 
 ```bash
-make getlibs
+make deps
 make build
 make program
 ```
@@ -47,6 +48,8 @@ Or use the wrapper:
 ./scripts/build.sh program
 ```
 
+`./scripts/build.sh` runs `make deps` first. **`make deps`** is an alias for **`make getlibs`**: it fetches Infineon libraries into `mtb_shared/` and third-party assets listed in `deps/*.mtb` (including u8g2 into gitignored `libs/u8g2/`). Fresh clone: run `make deps` once before building.
+
 ## Serial Telemetry
 
 Open the KitProg USB serial port at 115200 8N1. The firmware prints one line every 500 ms:
@@ -55,7 +58,42 @@ Open the KitProg USB serial port at 115200 8N1. The firmware prints one line eve
 T=23.4C ALS=52% BTN0=0 BTN1=1 SLIDER=412/1000 GPIO=0x2F TH=... REF=... ALS_RAW=... A0=... A1=...
 ```
 
-GPIO bits are active-low because the template initializes D2-D9 with pull-ups.
+GPIO bits are active-low because the template initializes D3-D9 with pull-ups.
+
+## OLED display (u8g2)
+
+Wire the module to the Arduino header I2C pins (3.3 V, GND, SDA=D14, SCL=D15). Tie **RST** to 3.3 V. **Adafruit 1.3" 128×64** (#1101) is **SH1106** — use `APP_DISPLAY_USE_SH1106=1` and `APP_DISPLAY_SH1106_WINSTAR=1` (correct DC-DC init); u8g2’s `noname` SH1106 driver wrongly sends SSD1306 charge-pump commands. **0.96"** modules are usually SSD1306 (`APP_DISPLAY_USE_SH1106=0`). After `make deps`, the build uses:
+
+- `mtb_shared/display-oled-ssd1306` — low-level SSD1306 init (`mtb_ssd1306_init_i2c` on the shared `i2c_bus`)
+- `libs/u8g2/csrc` — u8g2 graphics library (`deps/u8g2.mtb`, fetched by `make deps` into gitignored `libs/`)
+- `source/display_gfx.c` — thin wrappers named like Adafruit_GFX for porting Teensy menu code
+
+Text size mapping for `display_gfx_set_text_size()`:
+
+| Size | u8g2 font (approx. Adafruit) |
+| --- | --- |
+| 0, 1 | 5x8 (menu default; close to Adafruit size 1) |
+| 2 | 9x15 |
+| 6 | logisoso32 (large digits) |
+
+Boot logos: convert once to XBM and call `display_gfx_draw_bitmap()`.
+
+### MCP23008 buttons (same I2C bus)
+
+On the display board, an **MCP23008** GPIO expander shares the OLED I2C bus at **0x23** (7-bit; A2=0, A1=1, A0=1 → `0x20|0x03`). Boot scans **0x20–0x27**. GP0–GP3 are active-low inputs with internal pull-ups enabled in firmware:
+
+| GPIO | Button |
+| --- | --- |
+| GP0 | Down |
+| GP1 | Menu |
+| GP2 | Enter |
+| GP3 | Up |
+
+The OLED shows a 4-character line `BTN:____` (nothing pressed) or e.g. `BTN:_M__` (menu only) or `BTN:UDME` (all pressed). Display order is **U D M E** (not GPIO order). USB telemetry includes `MCP=____` on the same schedule.
+
+MCP23008 **INT** is wired to **Arduino D2** (P5[0]). On any button change the firmware prints `BTN:____` immediately on USB serial (I2C read runs in the main loop, not inside the ISR). D2 is not included in the kit `GPIO=0x..` mask (that is D3–D9 only).
+
+Config in `source/app_config.h`: `APP_ENABLE_MCP23008`, `APP_MCP23008_I2C_ADDR` (default `0x20`), `APP_MCP23008_INT_PIN`.
 
 ## Pin Map
 
@@ -64,7 +102,7 @@ GPIO bits are active-low because the template initializes D2-D9 with pull-ups.
 | Debug UART | P3[1] TX, P3[0] RX |
 | MIDI UART | P0[3] TX / Arduino D1, P0[2] RX / Arduino D0 |
 | I2C | P6[4] SCL / Arduino D15, P6[5] SDA / Arduino D14 |
-| GPIO inputs | D2-D9 |
+| GPIO inputs | D3-D9 (D2 = MCP23008 INT) |
 | Header analog | A0 / P10[0], A1 / P10[1] |
 | Onboard analog | Thermistor/reference on SAR channels 0/1, ALS on channel 2 |
 | LEDs | CYBSP_USER_LED1 / CYBSP_USER_LED2 |

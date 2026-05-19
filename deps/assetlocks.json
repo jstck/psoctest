@@ -30,5 +30,9 @@
     {
         "asset-name": "recipe-make-cat1a",
         "locked-commit": "release-v2.7.0"
+    },
+    {
+        "asset-name": "u8g2",
+        "locked-commit": "2.36.9"
     }
 ]
