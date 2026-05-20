@@ -2,37 +2,51 @@
 
 #include <stdio.h>
 
+#include "app_config.h"
 #include "mcp23008_buttons.h"
 
 void telemetry_print_header(void)
 {
     printf("\x1b[2J\x1b[;H");
     printf("PSoC 62S4 template telemetry\r\n");
-    printf("Fields: temperature, ambient light, CapSense buttons/slider, GPIO mask, raw ADC counts\r\n\r\n");
+    printf("CapSense pads: P0=J11.5 P1=J11.6 P2=A13 P3=J11.10 P4=J11.9 P5=J11.8 P6=J11.7\r\n\r\n");
 }
 
-void telemetry_print(const sensor_readings_t *sensors,
-                     const capsense_app_state_t *capsense,
-                     uint16_t gpio_mask)
+void telemetry_print(const capsense_app_state_t *capsense)
 {
     char mcp_btn[5];
 
-    (void)mcp23008_buttons_poll(mcp_btn);
+    if (NULL == capsense)
+    {
+        return;
+    }
 
-    printf("ADC=%s T=%3.1fC ALS=%u%% BTN0=%u BTN1=%u SLIDER=%3u/%3u GPIO=0x%02X"
-           " MCP=%s TH=%ld REF=%ld ALS_RAW=%ld A0=%ld A1=%ld\r\n",
-           sensors->adc_ok ? "OK" : "ERR",
-           sensors->temperature_c,
-           (unsigned int)sensors->light_percent,
-           capsense->button0_active ? 1u : 0u,
-           capsense->button1_active ? 1u : 0u,
-           (unsigned int)(capsense->slider_active ? capsense->slider_position : 0u),
-           (unsigned int)capsense->slider_resolution,
-           (unsigned int)gpio_mask,
-           mcp_btn,
-           (long)sensors->thermistor_counts,
-           (long)sensors->reference_counts,
-           (long)sensors->als_counts,
-           (long)sensors->analog0_counts,
-           (long)sensors->analog1_counts);
+#if APP_ENABLE_MCP23008
+    (void)mcp23008_buttons_poll(mcp_btn);
+#else
+    mcp_btn[0] = '-';
+    mcp_btn[1] = '-';
+    mcp_btn[2] = '-';
+    mcp_btn[3] = '-';
+    mcp_btn[4] = '\0';
+#endif
+
+    printf("DIFF P0=%4u P1=%4u P2=%4u P3=%4u P4=%4u P5=%4u P6=%4u MCP=%s\r\n",
+           (unsigned int)capsense->pad_diff[0],
+           (unsigned int)capsense->pad_diff[1],
+           (unsigned int)capsense->pad_diff[2],
+           (unsigned int)capsense->pad_diff[3],
+           (unsigned int)capsense->pad_diff[4],
+           (unsigned int)capsense->pad_diff[5],
+           (unsigned int)capsense->pad_diff[6],
+           mcp_btn);
+
+    printf("ACT  P0=%u P1=%u P2=%u P3=%u P4=%u P5=%u P6=%u\r\n",
+           capsense->pad_active[0] ? 1u : 0u,
+           capsense->pad_active[1] ? 1u : 0u,
+           capsense->pad_active[2] ? 1u : 0u,
+           capsense->pad_active[3] ? 1u : 0u,
+           capsense->pad_active[4] ? 1u : 0u,
+           capsense->pad_active[5] ? 1u : 0u,
+           capsense->pad_active[6] ? 1u : 0u);
 }

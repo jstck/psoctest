@@ -164,13 +164,11 @@ cy_rslt_t display_init(void)
     return CY_RSLT_SUCCESS;
 }
 
-void display_update(const sensor_readings_t *sensors,
-                    const capsense_app_state_t *capsense,
-                    uint16_t gpio_mask)
+void display_update(const capsense_app_state_t *capsense)
 {
     char line[24];
 
-    if (!s_display_ready || (NULL == sensors) || (NULL == capsense))
+    if (!s_display_ready || (NULL == capsense))
     {
         return;
     }
@@ -179,32 +177,31 @@ void display_update(const sensor_readings_t *sensors,
     display_gfx_set_text_size(&s_gfx, 1);
     display_gfx_set_cursor(&s_gfx, 0, 0);
 
-    (void)snprintf(line, sizeof(line), "ADC:%s T:%.1fC",
-                   sensors->adc_ok ? "OK" : "ERR", sensors->temperature_c);
+    (void)snprintf(line, sizeof(line), "P0:%4u P1:%4u P2:%4u",
+                   (unsigned int)capsense->pad_diff[0],
+                   (unsigned int)capsense->pad_diff[1],
+                   (unsigned int)capsense->pad_diff[2]);
     display_gfx_println(&s_gfx, line);
 
-    (void)snprintf(line, sizeof(line), "ALS:%u%% TH:%ld",
-                   (unsigned int)sensors->light_percent,
-                   (long)sensors->thermistor_counts);
+    (void)snprintf(line, sizeof(line), "P3:%4u P4:%4u P5:%4u",
+                   (unsigned int)capsense->pad_diff[3],
+                   (unsigned int)capsense->pad_diff[4],
+                   (unsigned int)capsense->pad_diff[5]);
     display_gfx_println(&s_gfx, line);
 
-    (void)snprintf(line, sizeof(line), "B0:%u B1:%u SL:%u",
-                   capsense->button0_active ? 1u : 0u,
-                   capsense->button1_active ? 1u : 0u,
-                   (unsigned int)(capsense->slider_active ? capsense->slider_position : 0u));
+    (void)snprintf(line, sizeof(line), "P6:%4u",
+                   (unsigned int)capsense->pad_diff[6]);
     display_gfx_println(&s_gfx, line);
 
-    (void)snprintf(line, sizeof(line), "GPIO:0x%02X A0:%ld",
-                   (unsigned int)gpio_mask, (long)sensors->analog0_counts);
-    display_gfx_println(&s_gfx, line);
-
+#if APP_ENABLE_MCP23008
     {
         char btn[5];
 
         (void)mcp23008_buttons_poll(btn);
-        (void)snprintf(line, sizeof(line), "BTN:%s", btn);
+        (void)snprintf(line, sizeof(line), "MCP:%s", btn);
         display_gfx_println(&s_gfx, line);
     }
+#endif
 
     display_gfx_flush(&s_gfx);
 }

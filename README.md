@@ -4,10 +4,9 @@ Template firmware for the CY8CKIT-062S4 PSoC 62S4 Pioneer Kit.
 
 ## Features
 
-- CapSense buttons and 5-segment slider.
-- SAR ADC scaffold for the onboard thermistor, onboard ambient light sensor, and Arduino A0/A1 header inputs.
-- Seven pulled-up GPIO inputs on Arduino D3-D9 (D2 is MCP23008 INT when that board is used).
-- User LED heartbeat on LED1 and ambient-light threshold output on LED2.
+- Seven CapSense pads on kit **P7/P8/P9** CSD pins (J11 extended header + A13 after resistor rework); raw diff on serial for tuning.
+- User LED heartbeat on LED1.
+- Optional SAR ADC (`APP_ENABLE_SAR_ADC`), I2C display, MCP23008 buttons, and MIDI (off by default in `app_config.h`).
 - I2C master on P6[4] SCL / P6[5] SDA.
 - SSD1306 128x64 OLED via Infineon `display-oled-ssd1306` + u8g2 (see `source/display_gfx.*` for Adafruit-like helpers).
 - MIDI UART scaffold on Arduino D1 TX / D0 RX at 31250 baud.
@@ -52,13 +51,33 @@ Or use the wrapper:
 
 ## Serial Telemetry
 
-Open the KitProg USB serial port at 115200 8N1. The firmware prints one line every 500 ms:
+Open the KitProg USB serial port at 115200 8N1. Every second you get seven per-pad **difference counts** and active flags (P0–P6 map to J11/A13 after kit rework):
 
 ```text
-T=23.4C ALS=52% BTN0=0 BTN1=1 SLIDER=412/1000 GPIO=0x2F TH=... REF=... ALS_RAW=... A0=... A1=...
+DIFF P0=  12 P1=   8 P2=  15 P3=  20 P4=  11 P5=   9 P6=  14 MCP=----
+ACT  P0=0 P1=0 P2=0 P3=0 P4=0 P5=0 P6=0
 ```
 
-GPIO bits are active-low because the template initializes D3-D9 with pull-ups.
+| Index | After J11 rework | MCU pin | CapSense widget |
+| --- | --- | --- | --- |
+| P0 | J11.5 | P7[0] | Button0 |
+| P1 | J11.6 | P7[1] | Button1 |
+| P2 | A13 (J2.12) | P9[3] | Pad5 |
+| P3 | J11.10 | P8[1] | Pad6 |
+| P4 | J11.9 | P8[0] | Pad7 |
+| P5 | J11.8 | P7[3] | Pad8 |
+| P6 | J11.7 | P7[2] | Pad9 |
+
+Values rise when touched. Tune in CapSense Configurator or Tuner (`APP_ENABLE_CAPSENSE_TUNER`). See kit guide §3.3.1 for resistor swaps (R48/R50, etc.).
+
+Config: `design.cycapsense` (seven `CSD_BUTTON` widgets) and `design.modus` (CSD sense mux). Regenerate after edits:
+
+```bash
+export CY_TOOLS_PATHS=$HOME/Applications/ModusToolbox/tools_3.8
+capsense-configurator-cli -c bsps/TARGET_APP_CY8CKIT-062S4/config/design.cycapsense \
+  -o bsps/TARGET_APP_CY8CKIT-062S4/config/GeneratedSource
+device-configurator-cli --build bsps/TARGET_APP_CY8CKIT-062S4/config/design.modus
+```
 
 ## OLED display (u8g2)
 

@@ -12,6 +12,18 @@ static volatile bool scan_complete;
 static bool tuner_enabled;
 static capsense_app_state_t state;
 
+/* Widget order matches dedicated-pin assignment in device configurator. */
+static const uint8_t s_pad_widget_ids[APP_CAPSENSE_PAD_COUNT] =
+{
+    CY_CAPSENSE_BUTTON0_WDGT_ID,
+    CY_CAPSENSE_BUTTON1_WDGT_ID,
+    CY_CAPSENSE_PAD5_WDGT_ID,
+    CY_CAPSENSE_PAD6_WDGT_ID,
+    CY_CAPSENSE_PAD7_WDGT_ID,
+    CY_CAPSENSE_PAD8_WDGT_ID,
+    CY_CAPSENSE_PAD9_WDGT_ID,
+};
+
 static cyhal_ezi2c_t tuner_ezi2c;
 static cyhal_ezi2c_slave_cfg_t tuner_slave_cfg;
 static cyhal_ezi2c_cfg_t tuner_cfg;
@@ -62,9 +74,6 @@ cy_rslt_t capsense_app_init(bool enable_tuner)
         }
     }
 
-    state.slider_resolution =
-        cy_capsense_context.ptrWdConfig[CY_CAPSENSE_LINEARSLIDER0_WDGT_ID].xResolution;
-
     Cy_CapSense_ScanAllWidgets(&cy_capsense_context);
 
     return CY_RSLT_SUCCESS;
@@ -114,20 +123,17 @@ static cy_rslt_t init_tuner(void)
 
 static void update_state(void)
 {
-    cy_stc_capsense_touch_t *slider_touch_info;
+    uint32_t i;
 
-    state.button0_active = 0u != Cy_CapSense_IsSensorActive(
-        CY_CAPSENSE_BUTTON0_WDGT_ID, CY_CAPSENSE_BUTTON0_SNS0_ID,
-        &cy_capsense_context);
+    for (i = 0u; i < APP_CAPSENSE_PAD_COUNT; i++)
+    {
+        uint32_t wdgt_id = s_pad_widget_ids[i];
 
-    state.button1_active = 0u != Cy_CapSense_IsSensorActive(
-        CY_CAPSENSE_BUTTON1_WDGT_ID, CY_CAPSENSE_BUTTON1_SNS0_ID,
-        &cy_capsense_context);
-
-    slider_touch_info = Cy_CapSense_GetTouchInfo(CY_CAPSENSE_LINEARSLIDER0_WDGT_ID,
-                                                 &cy_capsense_context);
-    state.slider_active = slider_touch_info->numPosition != 0u;
-    state.slider_position = state.slider_active ? slider_touch_info->ptrPosition->x : 0u;
+        state.pad_diff[i] =
+            cy_capsense_context.ptrWdConfig[wdgt_id].ptrSnsContext[0].diff;
+        state.pad_active[i] = 0u != Cy_CapSense_IsSensorActive(
+            wdgt_id, 0u, &cy_capsense_context);
+    }
 }
 
 static void capsense_isr(void)

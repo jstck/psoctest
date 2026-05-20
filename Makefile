@@ -92,6 +92,7 @@ DISABLE_COMPONENTS=
 
 # Use source/u8g2_support.c (finite I2C timeout) instead of the library copy.
 CY_IGNORE += mtb_shared/display-oled-ssd1306/release-v1.0.3/configs/u8g2/u8g2_support.c
+CY_IGNORE += source/gpio_inputs.c
 
 # u8g2 csrc — fetched by `make deps` / `make getlibs` into gitignored libs/u8g2/.
 # Ignore auto-discovery of the full upstream tree; compile only csrc/*.c via SOURCES.

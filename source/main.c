@@ -7,7 +7,6 @@
 #include "cybsp.h"
 #include "cyhal.h"
 #include "display_ssd1306.h"
-#include "gpio_inputs.h"
 #include "i2c_bus.h"
 #include "led.h"
 #include "mcp23008_buttons.h"
@@ -21,7 +20,9 @@ static void boot_log(const char *msg);
 int main(void)
 {
     cy_rslt_t result;
+#if APP_ENABLE_SAR_ADC
     sensor_readings_t sensors = {0};
+#endif
     uint32_t elapsed_ms = 0;
     uint32_t sensor_ms = 0;
     uint32_t telemetry_ms = 0;
@@ -50,11 +51,10 @@ int main(void)
     boot_log("init: LED...");
     handle_error(led_init());
 
-    boot_log("init: GPIO inputs...");
-    handle_error(gpio_inputs_init());
-
+#if APP_ENABLE_SAR_ADC
     boot_log("init: SAR ADC...");
     handle_error(sensors_adc_init());
+#endif
 
     boot_log("init: CapSense...");
     handle_error(capsense_app_init(APP_ENABLE_CAPSENSE_TUNER));
@@ -96,26 +96,26 @@ int main(void)
 
         capsense_app_process();
 
+#if APP_ENABLE_SAR_ADC
         if ((elapsed_ms - sensor_ms) >= APP_SENSOR_PERIOD_MS)
         {
             sensor_ms = elapsed_ms;
             (void)sensors_adc_read(&sensors);
-
-            /* Simple visible behavior: LED2 follows ambient light threshold. */
             led_set(APP_LED_2, sensors.light_percent < 45u);
         }
+#endif
 
         if ((elapsed_ms - telemetry_ms) >= APP_TELEMETRY_PERIOD_MS)
         {
             telemetry_ms = elapsed_ms;
-            telemetry_print(&sensors, capsense_app_get_state(), gpio_inputs_read_mask());
+            telemetry_print(capsense_app_get_state());
         }
 
 #if APP_ENABLE_DISPLAY
         if ((elapsed_ms - display_ms) >= APP_DISPLAY_PERIOD_MS)
         {
             display_ms = elapsed_ms;
-            display_update(&sensors, capsense_app_get_state(), gpio_inputs_read_mask());
+            display_update(capsense_app_get_state());
         }
 #endif
 

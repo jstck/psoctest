@@ -5,13 +5,13 @@
 #include <stdint.h>
 #include "cy_result.h"
 
+/* Seven CSD electrodes: kit P7/P8/P9 pins (J11 rework + A13 for slider0). */
+#define APP_CAPSENSE_PAD_COUNT  (7u)
+
 typedef struct
 {
-    bool button0_active;
-    bool button1_active;
-    bool slider_active;
-    uint16_t slider_position;
-    uint16_t slider_resolution;
+    uint16_t pad_diff[APP_CAPSENSE_PAD_COUNT];
+    bool pad_active[APP_CAPSENSE_PAD_COUNT];
 } capsense_app_state_t;
 
 cy_rslt_t capsense_app_init(bool enable_tuner);
